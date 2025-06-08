@@ -6,7 +6,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-void reset_screen(App *app) { memset(&app->lines.lines, 0, 100000 * sizeof(SDL_FRect)); };
+void reset_screen(App *app)
+{
+    memset(&app->lines.lines, 0, 100000 * sizeof(SDL_FRect));
+    app->lines.count = 0;
+};
 
 int main(int argc, char *argv[])
 {
