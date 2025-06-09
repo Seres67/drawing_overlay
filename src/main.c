@@ -1,48 +1,57 @@
 #include "button.h"
 #include "mouse.h"
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_events.h>
-#include <SDL3/SDL_rect.h>
+#include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_render.h>
 #include <app.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 
-void reset_screen(App *app)
+void clear_screen(App *app)
 {
-    for (int i = 0; i < app->strokes.count; ++i)
-        memset(app->strokes.strokes[i].points, 0, POINTS_COUNT * sizeof(SDL_FRect));
-    memset(&app->strokes.strokes, 0, STROKES_COUNT * sizeof(Stroke));
-    app->strokes.count = 0;
+    for (int i = 0; i < app->canvas.count; ++i)
+        memset(app->canvas.strokes[i].points, 0, POINTS_COUNT * sizeof(SDL_FRect));
+    memset(&app->canvas.strokes, 0, STROKES_COUNT * sizeof(Stroke));
+    app->canvas.count = 0;
 };
 
 void undo_stroke(App *app)
 {
-    if (app->strokes.count > 0) {
-        app->strokes.strokes[app->strokes.count - 1].hidden = true;
-        app->strokes.count--;
+    if (app->canvas.count > 0) {
+        app->canvas.strokes[app->canvas.count - 1].hidden = true;
+        app->canvas.count--;
     }
 }
 
 void redo_stroke(App *app)
 {
-    if (app->strokes.strokes[app->strokes.count].hidden) {
-        app->strokes.strokes[app->strokes.count].hidden = false;
-        app->strokes.count++;
+    if (app->canvas.strokes[app->canvas.count].hidden) {
+        app->canvas.strokes[app->canvas.count].hidden = false;
+        app->canvas.count++;
     }
 }
+
+void set_color(App *app, const ColorButton button) { app->current_color = button.color; }
 
 void save_to_file(App *app) {}
 
 int main(int argc, char *argv[])
 {
-    App app = {NULL, NULL, true, {false, false, 0, 0}, {0}, NULL};
-    Button clear = {"Clear", {0, 0, 40, 40}, NULL, reset_screen};
+    App app = {NULL, NULL, true, {false, false, 0, 0}, {0}, NULL, {255, 0, 0, 255}};
+    Button clear = {"Clear", {0, 0, 40, 40}, NULL, clear_screen};
     Button undo = {"Undo", {40, 0, 40, 40}, NULL, undo_stroke};
     Button redo = {"Redo", {80, 0, 40, 40}, NULL, redo_stroke};
     Button save = {"Save", {120, 0, 40, 40}, NULL, save_to_file};
     Button buttons[] = {clear, undo, redo, save, {NULL}};
+
+    ColorButton red = {{255, 0, 0, 255}, {160, 0, 40, 40}, NULL, set_color};
+    ColorButton green = {{0, 255, 0, 255}, {200, 0, 40, 40}, NULL, set_color};
+    ColorButton blue = {{0, 0, 255, 255}, {240, 0, 40, 40}, NULL, set_color};
+    ColorButton yellow = {{255, 255, 0, 255}, {280, 0, 40, 40}, NULL, set_color};
+    ColorButton black = {{0, 0, 0, 255}, {320, 0, 40, 40}, NULL, set_color};
+    ColorButton white = {{255, 255, 255, 255}, {360, 0, 40, 40}, NULL, set_color};
+    ColorButton colors[] = {red, green, blue, yellow, black, white, {0}};
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         SDL_Log("couldn't init SDL: %s\n", SDL_GetError());
@@ -89,8 +98,17 @@ int main(int argc, char *argv[])
                     app.mouse_state.mouse_left = true;
                     bool found_button = false;
                     for (int i = 0; buttons[i].text; ++i) {
-                        if (is_button_clicked(buttons[i], event.button.x, event.button.y)) {
+                        if (is_mouse_in_button(buttons[i], event.button.x, event.button.y)) {
                             buttons[i].callback(&app);
+                            found_button = true;
+                        }
+                    }
+                    if (found_button)
+                        break;
+                    found_button = false;
+                    for (int i = 0; colors[i].color.a != 0; ++i) {
+                        if (is_mouse_in_color_button(colors[i], event.button.x, event.button.y)) {
+                            colors[i].callback(&app, colors[i]);
                             found_button = true;
                         }
                     }
@@ -98,13 +116,15 @@ int main(int argc, char *argv[])
                         break;
                     app.mouse_state.x = event.motion.x;
                     app.mouse_state.y = event.motion.y;
-                    if (app.strokes.strokes[app.strokes.count].hidden) {
-                        app.strokes.strokes[app.strokes.count].hidden = false;
-                        memset(app.strokes.strokes[app.strokes.count].points, 0, POINTS_COUNT * sizeof(SDL_FPoint));
-                        app.strokes.strokes[app.strokes.count].count = 0;
+                    // NOTE: this replaces next stroke if it is hidden
+                    if (app.canvas.strokes[app.canvas.count].hidden) {
+                        app.canvas.strokes[app.canvas.count].hidden = false;
+                        memset(app.canvas.strokes[app.canvas.count].points, 0, POINTS_COUNT * sizeof(SDL_FPoint));
+                        app.canvas.strokes[app.canvas.count].count = 0;
                         // TODO: also memset 0 all following strokes and points and reset count and hidden
                     }
-                    app.strokes.count++;
+                    app.canvas.strokes[app.canvas.count].color = app.current_color;
+                    app.canvas.count++;
                 }
                 if (event.button.button == MouseRight)
                     app.mouse_state.mouse_right = true;
@@ -122,34 +142,38 @@ int main(int argc, char *argv[])
                         undo_stroke(&app);
                     } else if (event.key.key == SDLK_Y) {
                         redo_stroke(&app);
+                    } else if (event.key.key == SDLK_R) {
+                        clear_screen(&app);
                     }
                 }
             }
             if (app.mouse_state.mouse_left && event.type == SDL_EVENT_MOUSE_MOTION) {
-                app.strokes.strokes[app.strokes.count - 1].points[app.strokes.strokes[app.strokes.count - 1].count] =
+                app.canvas.strokes[app.canvas.count - 1].points[app.canvas.strokes[app.canvas.count - 1].count] =
                     (SDL_FPoint){app.mouse_state.x, app.mouse_state.y};
-                app.strokes.strokes[app.strokes.count - 1].count++;
+                app.canvas.strokes[app.canvas.count - 1].count++;
                 app.mouse_state.x += event.motion.xrel;
                 app.mouse_state.y += event.motion.yrel;
             }
         }
+        // NOTE: setting window transparent
         SDL_SetRenderDrawColor(app.renderer, 0, 0, 0, 0);
         SDL_RenderClear(app.renderer);
 
+        for (int i = 0; i < app.canvas.count; ++i) {
+            if (!app.canvas.strokes[i].hidden) {
+                SDL_SetRenderDrawColor(app.renderer, app.canvas.strokes[i].color.r, app.canvas.strokes[i].color.g,
+                                       app.canvas.strokes[i].color.b, app.canvas.strokes[i].color.a);
+                SDL_RenderLines(app.renderer, app.canvas.strokes[i].points, app.canvas.strokes[i].count);
+            }
+        }
+
+        for (int i = 0; buttons[i].text; ++i)
+            button_draw(buttons[i], app);
+        for (int i = 0; colors[i].color.a != 0; ++i)
+            button_color_draw(colors[i], &app);
+
         // TODO: draw corners
 
-        SDL_SetRenderDrawColor(app.renderer, 0, 0, 0, 255);
-        for (int i = 0; buttons[i].text; ++i)
-            SDL_RenderFillRect(app.renderer, &buttons[i].rect);
-
-        SDL_SetRenderDrawColor(app.renderer, 255, 0, 0, 255);
-
-        for (int i = 0; buttons[i].text; ++i)
-            SDL_RenderTexture(app.renderer, buttons[i].texture, NULL, &buttons[i].rect);
-
-        for (int i = 0; i < app.strokes.count; ++i)
-            if (!app.strokes.strokes[i].hidden)
-                SDL_RenderLines(app.renderer, app.strokes.strokes[i].points, app.strokes.strokes[i].count);
         SDL_RenderPresent(app.renderer);
     }
     return 0;

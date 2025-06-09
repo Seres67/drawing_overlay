@@ -1,6 +1,7 @@
 #ifndef DRAWING_OVERLAY_APP_H_
 #define DRAWING_OVERLAY_APP_H_
 
+#include <SDL3/SDL_pixels.h>
 #include <SDL3/SDL_rect.h>
 #include <SDL3/SDL_render.h>
 #include <SDL3_ttf/SDL_ttf.h>
@@ -14,6 +15,7 @@ typedef struct
 {
     int count;
     SDL_FPoint points[POINTS_COUNT];
+    SDL_Color color;
     bool hidden;
 } Stroke;
 
@@ -21,7 +23,7 @@ typedef struct
 {
     int count;
     Stroke strokes[STROKES_COUNT];
-} Strokes;
+} Canvas;
 
 typedef struct
 {
@@ -29,8 +31,9 @@ typedef struct
     SDL_Renderer *renderer;
     bool running;
     MouseState mouse_state;
-    Strokes strokes;
+    Canvas canvas;
     TTF_Font *font;
+    SDL_Color current_color;
 } App;
 
 // TODO: changes lines to strokes
