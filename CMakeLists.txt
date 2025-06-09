@@ -9,4 +9,4 @@ include_directories(include)
 file(GLOB_RECURSE src src/**.c)
 
 add_executable(drawing_overlay ${src})
-target_link_libraries(drawing_overlay SDL3 SDL3_ttf)
+target_link_libraries(drawing_overlay SDL3 SDL3_ttf SDL3_image)

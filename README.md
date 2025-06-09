@@ -4,6 +4,10 @@ A simple drawing overlay for Wayland using SDL3. Tested with sway.
 
 WIP
 
+## Prerequisites
+
+- grim for copy/save
+
 ## Usage
 
 run the executable, a transparent window will appear (fixed 1920x1080 for now.), draw on it.  

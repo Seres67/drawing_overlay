@@ -1,11 +1,12 @@
-#include "button.h"
-#include "mouse.h"
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_pixels.h>
-#include <SDL3/SDL_render.h>
+#include <SDL3_image/SDL_image.h>
 #include <app.h>
+#include <button.h>
+#include <mouse.h>
+#include <screenshot.h>
 #include <stdbool.h>
-#include <stdlib.h>
+#include <stddef.h>
+#include <stdio.h>
 #include <string.h>
 
 void clear_screen(App *app)
@@ -32,9 +33,26 @@ void redo_stroke(App *app)
     }
 }
 
-void set_color(App *app, const ColorButton button) { app->current_color = button.color; }
+void copy_to_clipboard(App *app)
+{
+    SDL_Surface *screenshot = grab_screenshot_surface();
+    if (!screenshot)
+        return;
+    ClipboardImage *clip = surface_to_png_data(screenshot);
+    SDL_DestroySurface(screenshot);
+    if (!clip)
+        return;
+    static const char *mime_types[] = {"image/png"};
+    bool success = SDL_SetClipboardData(clipboard_data_cb, clipboard_cleanup_cb, clip, mime_types, 1);
+    if (!success) {
+        SDL_Log("Failed to set clipboard data: %s\n", SDL_GetError());
+        clipboard_cleanup_cb(clip);
+    }
+}
 
 void save_to_file(App *app) {}
+
+void set_color(App *app, const ColorButton button) { app->current_color = button.color; }
 
 int main(int argc, char *argv[])
 {
@@ -42,15 +60,17 @@ int main(int argc, char *argv[])
     Button clear = {"Clear", {0, 0, 40, 40}, NULL, clear_screen};
     Button undo = {"Undo", {40, 0, 40, 40}, NULL, undo_stroke};
     Button redo = {"Redo", {80, 0, 40, 40}, NULL, redo_stroke};
-    Button save = {"Save", {120, 0, 40, 40}, NULL, save_to_file};
-    Button buttons[] = {clear, undo, redo, save, {NULL}};
+    // TODO: check if grim is installed
+    Button copy = {"Copy", {120, 0, 40, 40}, NULL, copy_to_clipboard};
+    Button save = {"Save", {160, 0, 40, 40}, NULL, save_to_file};
+    Button buttons[] = {clear, undo, redo, copy, save, {NULL}};
 
-    ColorButton red = {{255, 0, 0, 255}, {160, 0, 40, 40}, NULL, set_color};
-    ColorButton green = {{0, 255, 0, 255}, {200, 0, 40, 40}, NULL, set_color};
-    ColorButton blue = {{0, 0, 255, 255}, {240, 0, 40, 40}, NULL, set_color};
-    ColorButton yellow = {{255, 255, 0, 255}, {280, 0, 40, 40}, NULL, set_color};
-    ColorButton black = {{0, 0, 0, 255}, {320, 0, 40, 40}, NULL, set_color};
-    ColorButton white = {{255, 255, 255, 255}, {360, 0, 40, 40}, NULL, set_color};
+    ColorButton red = {{255, 0, 0, 255}, {200, 0, 40, 40}, NULL, set_color};
+    ColorButton green = {{0, 255, 0, 255}, {240, 0, 40, 40}, NULL, set_color};
+    ColorButton blue = {{0, 0, 255, 255}, {280, 0, 40, 40}, NULL, set_color};
+    ColorButton yellow = {{255, 255, 0, 255}, {320, 0, 40, 40}, NULL, set_color};
+    ColorButton black = {{0, 0, 0, 255}, {360, 0, 40, 40}, NULL, set_color};
+    ColorButton white = {{255, 255, 255, 255}, {400, 0, 40, 40}, NULL, set_color};
     ColorButton colors[] = {red, green, blue, yellow, black, white, {0}};
 
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
