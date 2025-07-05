@@ -8,6 +8,24 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <limits.h>
+#include <unistd.h>
+
+char *get_executable_dir() {
+    static char path[PATH_MAX];
+    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return NULL;
+    }
+    path[len] = '\0';
+
+    char *last_slash = strrchr(path, '/');
+    if (last_slash) {
+        *last_slash = '\0';
+    }
+    return path;
+}
 
 void clear_screen(App *app)
 {
@@ -15,7 +33,7 @@ void clear_screen(App *app)
         memset(app->canvas.strokes[i].points, 0, POINTS_COUNT * sizeof(SDL_FRect));
     memset(&app->canvas.strokes, 0, STROKES_COUNT * sizeof(Stroke));
     app->canvas.count = 0;
-};
+}
 
 void undo_stroke(App *app)
 {
@@ -83,7 +101,14 @@ int main(int argc, char *argv[])
         return SDL_APP_FAILURE;
     }
 
-    app.font = TTF_OpenFont("../assets/font.ttf", 13.f);
+    char *exe_dir = get_executable_dir();
+    if (!exe_dir) {
+        SDL_Log("Couldn't find executable directory\n");
+        return SDL_APP_FAILURE;
+    }
+    char font_path[PATH_MAX];
+    snprintf(font_path, sizeof(font_path), "%s/font.ttf", exe_dir);
+    app.font = TTF_OpenFont(font_path, 13.f);
     if (!app.font) {
         SDL_Log("couldn't open font: %s\n", SDL_GetError());
         return SDL_APP_FAILURE;
